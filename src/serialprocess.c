@@ -1,21 +1,3 @@
-//------------------------------------------------------------------------------------
-//-- (c) Copyright Matrox Graphics Inc.                            __  __   ____  ___
-//--                                                              |  \/  | / ___||_ _|
-//-- This documents contains confidential proprietary information | |\/| || |  _  | |
-//-- that may not be disclosed without prior written permission   | |  | || |_| | | |
-//-- from Matrox Graphics Inc.                                    |_|  |_| \____||___|
-//--
-//-- $Id: serialprocess.c 97901 2022-09-30 22:23:04Z sfortin $
-//-- $HeadURL: http://rex/mgi_svn/Users/sfortin/DdcSink_RP2040/serialprocess.c $
-//-- $Revision: 97901 $
-//-- $Date: 2022-09-30 18:23:04 -0400 (Fri, 30 Sep 2022) $
-//-- $Author: sfortin $
-//-- Author: Sylvain Fortin
-//-- Project: HDMI HDCP certification
-//-- Documentation:
-//-- Description: 
-//-- Note:
-//------------------------------------------------------------------------------------
 #include "serialprocess.h"
 
 char CmdHistory[CMD_HIST_SIZE][CMD_LENGTH];
