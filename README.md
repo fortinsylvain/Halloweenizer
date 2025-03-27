@@ -9,6 +9,9 @@ The Pico sends MIDI output to a Roland S-330 digital sampler, which plays eerie 
 
 ## 💡 DMX512 Lighting Control 
 The DMX512 output drives two RGB projectors, programmed to create dramatic lighting effects, including simulated thunderstorms and eerie color shifts to enhance the ambiance.
+![](projector_DMX512_front.jpg)
+
+![](projector_DMX512_back.jpg)
 
 ## 🛠️ Build & Implementation 
 ### Schematic (Hand-drawn draft)
