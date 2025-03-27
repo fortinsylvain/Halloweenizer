@@ -26,3 +26,6 @@ A permanent build is not planned at the moment, but the setup works well for its
 ## 🎃 Spooky Fun
 This project was a blast to build, generating both frighteningly fun effects for kids and a satisfying challenge for the programmer!
 
+## ⚠️ Warning: This project significantly boosts visibility, so be prepared to hand out plenty of candy to visitors!
+
+
