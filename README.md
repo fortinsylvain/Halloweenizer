@@ -15,7 +15,7 @@ The DMX512 output drives two RGB projectors, programmed to create dramatic light
 
 ## 🛠️ Build & Implementation 
 ### Schematic (Hand-drawn draft)
-A wal-mounted 5 V power supply provides power to the VSYS input of the Raspberry Pi pico and the other components. A MC3487 chip converts the 3.3V GPIO output into a differential pair, which is then connected to a female XLR connector. Another GPIO pin controls two 2N2222 NPN transistors to drive the MIDI connector.
+A wall-mounted 5 V power supply provides power to the VSYS input of the Raspberry Pi pico and the other components. A MC3487 Quadruple Differential Line Driver chip converts the 3.3V GPIO output into a differential pair, which is then connected to a female XLR connector. Another GPIO pin controls two 2N2222 NPN transistors connected in cascade to drive the MIDI connector.
 ![](schematic.jpg)
 
 The project is currently assembled on a breadboard:
