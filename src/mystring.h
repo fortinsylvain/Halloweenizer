@@ -1,3 +1,4 @@
+
 //#include "type.h"
 #include <stdbool.h>
 char ToUppercase(char);

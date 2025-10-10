@@ -8,22 +8,27 @@
 //-- Generated spooky sounds and light effects are intended to amuze the children 
 //-- and also the programmer :-)
 //------------------------------------------------------------------------------------
+#include <stdint.h>
+#include "pico/stdlib.h"
 #include <string.h> // for strcpy
 #include <stdio.h>
 #include <stdlib.h> // for atoi
 #include <time.h>  // for time in random number generator
 #include <math.h>
-#include "pico/stdlib.h"
+
 #include "hardware/uart.h"
 #include "hardware/irq.h"
 #include "hardware/gpio.h"
 #include "hardware/structs/iobank0.h"
 
+#include "pins.h"
+#include "led.h"
 #include "uartbuf.h"  // my uart buffer
 #include "mystring.h" // my string manipulations
 #include "serialprocess.h"
+#include "dmx.h"
 
-#define Str_Version "October 26, 2024 12H59"
+#define Str_Version "October 10, 2025 11H48"
 
 #define UART_ID uart0
 #define BAUD_RATE 115200
@@ -31,35 +36,10 @@
 #define STOP_BITS 1
 #define PARITY UART_PARITY_NONE
 
-#define break_us 88
-#define mab_us 8
-#define start_us 4
-#define data_us 4
-#define stop_us 4 // there is two stop bit
-
-// We are using pins 0 and 1, but see the GPIO function select table in the
-// datasheet for information on which other pins can be used.
-#define UART_TX_PIN 0
-#define UART_RX_PIN 1
-
-#define TP0_GPIO 6  // TP0 GP6 PCB pin<9>
-#define TP1_GPIO 7  // TP1 GP7 PCB pin<10>  
-#define TP2_GPIO 8  // TP2 GP8 PCB pin<11> 
-#define TP3_GPIO 9  // TP3 GP9 PCB pin<12>
-#define TP4_GPIO 10 // TP4 GP10 PCB pin<14>
-#define TP5_GPIO 11 // TP5 GP11 PCB pin<15>
-#define TP6_GPIO 12 // TP6 GP12 PCB pin<16>
-#define TP7_GPIO 13 // TP7 GP13 PCB pin<17>   Main Loop
-#define MidiOut_GPIO 14 // GP14 PCB pin<19>   Mido serial data out
-#define Data_GPIO 15    // GP15 PCB pin<20>   Serial data for DMX512
-
-//N.C. More than 12 channels make sampling drop from 25 to 16 MS/s on Zaleae Logic 16 LA
-
-#define LED_GPIO 25    // GP25 and don't have a pin on RP Pico board
-
 uint32_t MainLoopCount = 0;
 
-io_irq_ctrl_hw_t *irq_ctrl_base = &iobank0_hw->proc0_irq_ctrl;
+//io_irq_ctrl_hw_t *irq_ctrl_base = &iobank0_hw->proc0_irq_ctrl;
+
 
 typedef struct 
 {
@@ -190,10 +170,6 @@ void main() // This enable breakpoint before main loop
    // Now enable the UART to send interrupts - RX only
    uart_set_irq_enables(UART_ID, true, false);
 
-   ClearScreen();
-   printf("\n\rDMX controller for Raspberry Pi Pico\n\r");
-   printf("Firmware Version : %s\n\r", Str_Version);
-
    // IO Init
    // Initialize LED GPIO
    gpio_init(LED_GPIO);
@@ -224,13 +200,45 @@ void main() // This enable breakpoint before main loop
    gpio_init(Data_GPIO);
    gpio_set_dir(Data_GPIO, GPIO_OUT);
 
+   gpio_init(DMX_LED);
+   gpio_set_dir(DMX_LED, GPIO_IN);
+   gpio_put(DMX_LED, 1);   // DMX LED OFF
+
+   gpio_init(MIDI_LED);
+   gpio_set_dir(MIDI_LED, GPIO_IN);
+   gpio_put(MIDI_LED, 1);   // MIDI LED OFF
+
+   /*
+   // Do a couple of blinking on DMX and MIDI LED
+   for(uint8_t i = 0; i < 8; i++)
+   {
+      SetDmxLed(true);   // DMX LED ON
+      busy_wait_ms(100);
+      SetDmxLed(false);   // DMX LED OFF
+      busy_wait_ms(100);
+   }
+
+   for(uint8_t i = 0; i < 8; i++)
+   {
+      SetMidiLed(true);   // MIDI LED ON
+      busy_wait_ms(100);
+      SetMidiLed(false);   // MIDI LED OFF
+      busy_wait_ms(100);
+   }
+   */
+
+   ClearScreen();
+   printf("HALLOWEENIZER\r\n");
+   printf("DMX and MIDI controller for Raspberry Pi Pico\r\n");
+   printf("Firmware Version : %s\r\n", Str_Version);
+
    CmdStringFlag = false;
    AnsiEscapeState = 0;
    CmdHistSel = 0;
    InitHistory();
 
    CmdCharCnt = 0;
-   printf(">"); // prompt
+   //printf(">"); // prompt
 
    uint8_t TestCount = 0;
 
@@ -244,6 +252,10 @@ void main() // This enable breakpoint before main loop
    // Loop forever
    while (true)
    {
+      printf("----------\r\n");
+      printf("Loop BEGIN\r\n");
+      printf("----------\r\n");
+
       // Midi test
       MidiReset();
       uint8_t Note;
@@ -317,6 +329,7 @@ void main() // This enable breakpoint before main loop
       //}
 
       // Halloween orange
+      printf("Halloween orange\r\n");
       Note = 47;   // B2 Hurlement type syrene lower pitch (one shot)
       SoundStart(Note,127);
       colorA.intensity = 255;
@@ -359,6 +372,7 @@ void main() // This enable breakpoint before main loop
       Black(2000); 
 
       // Automatic color sudent change
+      printf("Automatic color change\r\n");
       SoundStart(43,127);  // G2 Laph Very lower frequency pitch
       SoundStart(77,127);  // F5 Crying body (one shot)
       Timereach = false;
@@ -390,6 +404,7 @@ void main() // This enable breakpoint before main loop
       Black(2000);
 
       // white ramp up down
+      printf("White ramp up down\r\n");
       colorA.intensity = 255;
       colorA.red = 0;
       colorA.green = 0;
@@ -409,6 +424,7 @@ void main() // This enable breakpoint before main loop
       busy_wait_ms(2000);
 
       // yello candy treets
+      printf("Yellow candy treets\r\n");
       SoundStart(79,127);  // G5 Crying body (one shot)
       busy_wait_ms(1000);
       SoundStop(79);
@@ -434,6 +450,7 @@ void main() // This enable breakpoint before main loop
       SoundStop(77);
 
       // Normal light
+      printf("Normal light\r\n");
       SoundStart(48,70);   // C3 Hurlement type syrene lower pitch (one shot)
       busy_wait_ms(1000);
       SoundStart(36,100);  // C2 Organ
@@ -448,6 +465,7 @@ void main() // This enable breakpoint before main loop
       Tremolo(0); // tremolo stop
 
       // Defective light (black glitch)
+      printf("Defective light (black glitch)\r\n");
       SoundStart(50,70);   // D3 Laph Very low frequency pitch
       busy_wait_ms(1000);
       SoundStart(36,100);  // C2 Organ
@@ -477,6 +495,7 @@ void main() // This enable breakpoint before main loop
       Tremolo(0); // tremolo stop
 
       // Cold purple black light
+      printf("Cold purple black light\r\n");
       SoundStart(63,100);  //D#4 Monster Whaaa
       busy_wait_ms(2000);
       SoundStop(63);
@@ -495,6 +514,7 @@ void main() // This enable breakpoint before main loop
       SoundStop(64);
 
       // Red hearth beat
+      printf("Red hearth beat\r\n");
       SoundStart(60,127); // C4 Rire lent (joue pendant l'appuie)
       busy_wait_ms(1000);
       SoundStop(60);
@@ -519,6 +539,7 @@ void main() // This enable breakpoint before main loop
       SoundStop(43);
 
       // Wavy color green
+      printf("Wavy color green\r\n");
       Note = 60;   // C4 Rire lent (joue pendant l'appuie)
       SoundStart(Note,90);
       colorC.intensity = 255;
@@ -574,6 +595,7 @@ void main() // This enable breakpoint before main loop
       SoundStop(Note);
 
       // Defective light (random color glitch)
+      printf("Defective light (random color glitch)\r\n");
       Note = 54;   // F#3 Hurlement type syrene (one shot)
       SoundStart(Note,127);
       busy_wait_ms(50);
@@ -605,6 +627,7 @@ void main() // This enable breakpoint before main loop
       send_color(colorB, 5000); // Light goes abruptly dead  
 
       // Random color quick change
+      printf("Random color quick change\r\n");
       uint8_t my_randomColorSound_array[] = {90, 91, 93, 95};
       for (int iter = 0; iter < 8; iter++)
       {
@@ -628,6 +651,7 @@ void main() // This enable breakpoint before main loop
       }
 
       // Pale skin
+      printf("Pale skin\r\n");
       Note = 38;   // D2 GLutural Water sink lower frequency pitch
       SoundStart(Note,60);
       colorA.intensity = 255;
@@ -668,6 +692,7 @@ void main() // This enable breakpoint before main loop
       Black(2000);
       
       // Cold blue
+      printf("Cold blue\r\n");
       Note = 43;   // G2 Laph Very lower frequency pitch
       SoundStart(Note,127);
       colorA.intensity = 255;
@@ -685,6 +710,7 @@ void main() // This enable breakpoint before main loop
       SoundStop(Note);
 
       // Thunderstorm lightning effect using white flash strobes
+      printf("Thunderstorm lightning effect\r\n");
       colorA.intensity = 255; // Black
       colorA.red = 0;
       colorA.green = 0;
@@ -713,6 +739,7 @@ void main() // This enable breakpoint before main loop
       ramp_color(colorB, colorA, 5000);
 
       // Blue dark modulation
+      printf("Blue dark modulation\r\n");
       colorA.intensity = 255;
       colorA.red = 0;
       colorA.green = 0;
@@ -737,6 +764,7 @@ void main() // This enable breakpoint before main loop
       ramp_color(colorB, colorA, 5000);   //fade out
 
       // White flash strobes on red background
+      printf("White flash strobes on red background\r\n");
       Note = 43;   // G2 Laph Very lower frequency pitch
       SoundStart(Note,127);
       colorA.intensity = 255;    // Red background
@@ -767,6 +795,7 @@ void main() // This enable breakpoint before main loop
       Black(2000);
 
       // burning
+      printf("Burning\r\n");
       colorA.red = 0;
       colorA.green = 0;
       colorA.blue = 0;
@@ -807,6 +836,7 @@ void main() // This enable breakpoint before main loop
       Black(3000);
 
       // Automatic strobe
+      printf("Automatic strobe\r\n");
       //void autostrobe(color_t color, uint8_t speed, uint16_t time_ms);  
       colorA.intensity = 255; // Blue
       colorA.red = 0;
@@ -879,6 +909,7 @@ void main() // This enable breakpoint before main loop
       Black(3000);
 
       // Automatic color gradual change
+      printf("Automatic color gradual change\r\n");
       Timereach = false;
       TimeStartUs = time_us_64(); // Time snapshot
       time_ms = 20000;
@@ -974,13 +1005,16 @@ void InterpretCmdString(char *CmdStr)
    }
    else if ((CmpStrEqu(CmdStr, "help") == true) | (CmpStrEqu(CmdStr, "?") == true))
    {
-      printf("\n\rDdcSink_Rp2040 help menu\n\r");
-      printf("cls             Clear screen\n\r");
-      printf("history         History of commands\n\r");
-      printf("!n              Refer to command line n\n\r");
-      printf("reset           Software reset\n\r");
-      printf("ver             Display firmware version\n\r");
-      printf("help | ?        Help for commands\n\r");
+      printf("\n\rHALLOWEENIZER help menu\r\n");
+      printf("stop            Stop the sequence\r\n");
+      printf("start           Start the sequence\r\n");
+      printf("reset           Software reset\r\n");
+      printf("cls             Clear screen\r\n");
+      printf("history         History of commands\r\n");
+      printf("!n              Refer to command line n\r\n");
+      printf("reset           Software reset\r\n");
+      printf("ver             Display firmware version\r\n");
+      printf("help | ?        Help for commands\r\n");
    }
    else
    {
@@ -996,68 +1030,6 @@ void InterpretCmdString(char *CmdStr)
    printf(">"); // Prompt
    CmdCharCnt = 0;
    ClearCmd();
-}
-
-// Generate one frame
-// ---------------------------------------------------------------
-// | START | D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | STOP | STOP |
-// ---------------------------------------------------------------
-void send_one_frame(uint8_t Data)
-{
-   gpio_put(Data_GPIO, false); // START '0'
-   busy_wait_us(start_us);
-   
-   (Data & 0x01) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D0
-   busy_wait_us(data_us);
-
-   (Data & 0x02) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D1
-   busy_wait_us(data_us);
-
-   (Data & 0x04) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D2
-   busy_wait_us(data_us);
-
-   (Data & 0x08) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D3
-   busy_wait_us(data_us);
-   
-   (Data & 0x10) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D4
-   busy_wait_us(data_us);
-
-   (Data & 0x20) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D5
-   busy_wait_us(data_us);
-
-   (Data & 0x40) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D6
-   busy_wait_us(data_us);
-
-   (Data & 0x80) ? gpio_put(Data_GPIO, true) : gpio_put(Data_GPIO, false);  // D7
-   busy_wait_us(data_us);
-
-   gpio_put(Data_GPIO, true);   // STOP '1'
-   busy_wait_us(stop_us);        // two bit time
-   busy_wait_us(stop_us);
-}
-
-// MAB | data0 data1 data2 data3 data4 | BREAK
-void send_packet(uint8_t* Data)
-{
-   gpio_put(Data_GPIO, true); // MAB '1'
-   busy_wait_us(mab_us);
-
-   send_one_frame(Data[0]);
-   send_one_frame(Data[1]);
-   send_one_frame(Data[2]);
-   send_one_frame(Data[3]);
-   send_one_frame(Data[4]);
-   send_one_frame(Data[5]);
-   send_one_frame(Data[6]);
-   send_one_frame(Data[7]);
-   send_one_frame(Data[8]);
-   send_one_frame(Data[9]);
-   send_one_frame(Data[10]);
-   send_one_frame(Data[11]);
-
-   gpio_put(Data_GPIO, false); // BREAK '0'
-   busy_wait_us(break_us);
-
 }
 
 void strobe(uint8_t number, uint16_t period_ms)
@@ -1223,6 +1195,7 @@ void autostrobe(color_t color, uint8_t speed, uint16_t time_ms)
 // 31250 baud, 32us bit period
 void TxMidiByte(uint8_t Data)
 {
+   SetMidiLed(true); // Led ON during transmission
    gpio_put(MidiOut_GPIO, 0); // START
    busy_wait_us(32);
    
@@ -1252,9 +1225,12 @@ void TxMidiByte(uint8_t Data)
 
    gpio_put(MidiOut_GPIO, 1);
    busy_wait_us(32);        // STOP last one bit
+
+   SetMidiLed(false); // Led ON during transmission
 }
 void MidiReset(void)
 {
+   printf("Midi Reset\r\n");
    // To attempt resynchronization
    TxMidiByte(0x80);    // Midi interface init with two note OFF
    TxMidiByte(60);      // 0x3C Middle C

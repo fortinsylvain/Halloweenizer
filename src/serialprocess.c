@@ -1,3 +1,5 @@
+
+#include <stdint.h>
 #include "serialprocess.h"
 
 char CmdHistory[CMD_HIST_SIZE][CMD_LENGTH];
