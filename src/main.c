@@ -27,6 +27,9 @@
 #include "mystring.h" // my string manipulations
 #include "serialprocess.h"
 #include "dmx.h"
+#include "midi.h"
+#include "notes.h"
+#include "scene.h"
 
 #define Str_Version "October 10, 2025 11H48"
 
@@ -53,10 +56,9 @@ typedef struct
 void InterpretCmdString(char *);
 void StoreInterpByte(uint8_t);
 void send_one_frame(uint8_t Data);
-
+void ramp_color(color_t colorA, color_t colorB, uint16_t time_ms);
 void strobe(uint8_t number, uint16_t period_ms);
 void send_color(color_t color, uint16_t time_ms);
-void ramp_color(color_t colorA, color_t colorB, uint16_t time_ms);
 int GenerateRandomInt (int MaxValue);
 void Black(uint16_t time_ms);
 void autostrobe(color_t color, uint8_t speed, uint16_t time_ms);
@@ -213,17 +215,17 @@ void main() // This enable breakpoint before main loop
    for(uint8_t i = 0; i < 8; i++)
    {
       SetDmxLed(true);   // DMX LED ON
-      busy_wait_ms(100);
+      busy_wait_ms(50);
       SetDmxLed(false);   // DMX LED OFF
-      busy_wait_ms(100);
+      busy_wait_ms(50);
    }
 
    for(uint8_t i = 0; i < 8; i++)
    {
       SetMidiLed(true);   // MIDI LED ON
-      busy_wait_ms(100);
+      busy_wait_ms(50);
       SetMidiLed(false);   // MIDI LED OFF
-      busy_wait_ms(100);
+      busy_wait_ms(50);
    }
    */
 
@@ -261,66 +263,7 @@ void main() // This enable breakpoint before main loop
       uint8_t Note;
       //while(1)
       //{
-         //Note = 36;   // C2 Organ   
-         //Note = 37;   // C#2 Organ   
-         //Note = 38;   // D2 GLutural Water sink lower frequency pitch
-         //Note = 39;   // D#2 Organ   
-         //Note = 40;   // E2 Organ   
-         //Note = 41;   // F2 Organ   
-         //Note = 42;   // F#2 GLutural Water sink frequency pitch
-         //Note = 43;   // G2 Laph Very lower frequency pitch
-         //Note = 44;   // G#2 Organ
-         //Note = 45;   // A2 Beast Glutural Lower Pitch
-         //Note = 46;   // A#2 Organ
-         //Note = 47;   // B2 Hurlement type syrene lower pitch (one shot)
-         //Note = 48;   // C3 Hurlement type syrene lower pitch (one shot)
-         //Note = 49;   // C#3 Organ
-         //Note = 50;   // D3 Laph Very low frequency pitch
-         //Note = 51;   // D#3 Beast Lower
-         //Note = 52;   // E3 Hurlement type syrene lower pitch (one shot)
-         //Note = 53;   // F3 Organ
-         //Note = 54;   // F#3 Hurlement type syrene (one shot)
-         //Note = 55;   // G3 Beast Glutural Low
-         //Note = 56;   // G#3 Organ
-         //Note = 57;   // A3 Thunderstorm (one shot)
-         //Note = 58;   // A#3 Organ
-         //Note = 59;   // B3 Organ
-         //Note = 60;   // C4 Rire lent (joue pendant l'appuie)
-         //Note = 61;   // C#4 Organ
-         //Note = 62;   // D4 Organ
-         //Note = 63;   // D#4 Monster Whaaa
-         //Note = 64;   // E4 Hurlement type syrene higher pitch (one shot)
-         //Note = 65;   // F4 Monster Whaaa higher pitch
-         //Note = 66;   // F#4 Organ
-         //Note = 67;   // G4 Organ
-         //Note = 68;   // G#4 Organ
-         //Note = 69;   // A Monster Classic
-         //Note = 70;   // A#4 Organ
-         //Note = 71;   // B4 Organ
-         //Note = 72;   // C5 Beast Glutural High
-         //Note = 73;   // C#5 Monster Whaaa higher pitch
-         //Note = 74;   // D5 Wild animal
-         //Note = 75;   // D#5 Gun shot (one shot)
-         //Note = 76;   // E5 Wild animal higher pitch
-         //Note = 77;   // F5 Crying body (one shot)
-         //Note = 78;   // F#5 Wild animal higher pitch
-         //Note = 79;   // G5 Crying body (one shot)
-         //Note = 80;   // G#5 Organ
-         //Note = 81;   // A5 Organ
-         //Note = 82;   // A#5 Laught High pitch
-         //Note = 83;   // B5 Wild animal higher pitch
-         //Note = 84;   // C6 Wild animal higher pitch
-         //Note = 85;   // C#6 -
-         //Note = 86;   // D6 Wild animal higher pitch
-         //Note = 87;   // D#6 Crying female (one shot)
-         //Note = 88;   // E6 Croincement court
-         //Note = 89;   // F6 Laught child
-         //Note = 90;   // F#6 Wild animal higher pitch
-         //Note = 91;   // G6 Croincement court 2
-         //Note = 92;   // G#6 Blody bird
-         //Note = 93;   // A6 Monster children Whaaa higher pitch
-         //Note = 94;   // A#6 Croincement court 3
-         //Note = 95;   // B6 Animal crying Highly
+         
 
          //SoundStart(Note,82);
          //busy_wait_ms(1000);
@@ -328,10 +271,77 @@ void main() // This enable breakpoint before main loop
          //busy_wait_ms(5000);
       //}
 
+      //scene_HalloweenOrange();
+
+
+      // Random polyphonic with color changes
+      printf("Play Random Polyphonic With Color Changes\r\n");
+      uint8_t my_note_array[] = {36, 37, 39, 40, 41, 44, 46, 49, 53, 56, 58, 59, 61, 62, 66, 67, 68, 70, 71, 80, 81};
+      #define NUM_NOTES (sizeof(my_note_array) / sizeof(my_note_array[0]))
+
+      Timereach = false;
+      TimeStartUs = time_us_64();
+      time_ms = 20000; // duration
+
+      Packet[7] = 0;
+      Packet[6] = 200; // Color function code
+
+      // Seed random once
+      static bool seeded = false;
+      if (!seeded)
+      {
+         srand(time(NULL));
+         seeded = true;
+      }
+
+      uint8_t playingNotes[4];
+      uint8_t numNotesToPlay;
+
+      while (!Timereach)
+      {
+         delta_t_us = time_us_64() - TimeStartUs;
+
+         // Randomize color for each packet
+         Packet[2] = rand() % 256; // Red
+         Packet[3] = rand() % 256; // Green
+         Packet[4] = rand() % 256; // Blue
+         Packet[1] = rand() % 128; // Intensity, optional
+         send_packet(Packet);
+
+         // Pick new random notes
+         numNotesToPlay = 3 + rand() % 3; // 3,4,5 notes
+         for (int i = 0; i < numNotesToPlay; i++)
+         {
+            playingNotes[i] = my_note_array[rand() % NUM_NOTES];
+            SoundStart(playingNotes[i], 64); // medium velocity
+         }
+
+         busy_wait_ms(2000);
+
+         // Stop previous notes
+         for (int i = 0; i < numNotesToPlay; i++)
+         {
+            SoundStop(playingNotes[i]);
+         }
+
+         if (delta_t_us > (time_ms * 1000))
+         {
+            Timereach = true;
+         }
+      }
+
+      // Stop all notes at the end
+      for (int i = 0; i < numNotesToPlay; i++)
+      {
+         SoundStop(playingNotes[i]);
+      }
+      Black(2000); // fade to black
+
+
       // Halloween orange
       printf("Halloween orange\r\n");
-      Note = 47;   // B2 Hurlement type syrene lower pitch (one shot)
-      SoundStart(Note,127);
+      Note = 47; // B2 Hurlement type syrene lower pitch (one shot)
+      SoundStart(Note, 127);
       colorA.intensity = 255;
       colorA.red = 0;
       colorA.green = 0;
@@ -341,13 +351,13 @@ void main() // This enable breakpoint before main loop
       colorB.green = 23;
       colorB.blue = 2;
       ramp_color(colorA, colorB, 4000);
-      //send_color(colorB, 13000);
-      // play organ for a while
-      uint8_t my_note_array[] = {36, 37, 39, 40, 41, 44, 46, 49, 53, 56, 58, 59, 61, 62, 66, 67, 68, 70, 71, 80, 81};
+      // send_color(colorB, 13000);
+      //  play organ for a while
+      //uint8_t my_note_array[] = {36, 37, 39, 40, 41, 44, 46, 49, 53, 56, 58, 59, 61, 62, 66, 67, 68, 70, 71, 80, 81};
       Timereach = false;
       TimeStartUs = time_us_64(); // Time snapshot
       time_ms = 20000;
-      Tremolo(0x7F);  // Max
+      Tremolo(0x7F);             // Max
       while (Timereach == false) // keep sending packets as long as not reached time period?
       {
          delta_t_us = time_us_64() - TimeStartUs;
@@ -355,21 +365,21 @@ void main() // This enable breakpoint before main loop
          uint8_t OrganRandomNote = my_note_array[OrganRandomNumber];
          uint16_t OrganRandomDuration = GenerateRandomInt(1500);
          uint8_t OrganRandomVelocity = GenerateRandomInt(127);
-         SoundStart(OrganRandomNote,OrganRandomVelocity);
-         //busy_wait_ms(300);
+         SoundStart(OrganRandomNote, OrganRandomVelocity);
+         // busy_wait_ms(300);
          send_color(colorB, OrganRandomDuration);
          SoundStop(OrganRandomNote);
-         if( delta_t_us > (time_ms * 1000))
+         if (delta_t_us > (time_ms * 1000))
          {
             Timereach = true;
          }
       }
-      Tremolo(0);  // OFF
+      Tremolo(0); // OFF
       SoundStop(Note);
-      SoundStart(Note,127);
+      SoundStart(Note, 127);
       ramp_color(colorB, colorA, 4000);
       SoundStop(Note);
-      Black(2000); 
+      Black(2000);
 
       // Automatic color sudent change
       printf("Automatic color change\r\n");
@@ -1085,53 +1095,6 @@ void send_color(color_t color, uint16_t time_ms)
    }
 }
 
-void ramp_color(color_t colorA, color_t colorB, uint16_t time_ms)
-{
-   // delta Y
-   float delta_intensity = (float)colorB.intensity - (float)colorA.intensity;
-   float delta_red = (float)colorB.red - (float)colorA.red;
-   float delta_green = (float)colorB.green - (float)colorA.green;
-   float delta_blue = (float)colorB.blue - (float)colorA.blue;
-   // delta Y / delta X (slope)
-   float m_intensity = (float)delta_intensity/(float)(1000*time_ms);
-   float m_red = (float)delta_red/(float)(1000*time_ms);
-   float m_green = (float)delta_green/(float)(1000*time_ms);
-   float m_blue = (float)delta_blue/(float)(1000*time_ms);
-   
-   color_t colorX;
-
-   uint64_t delta_t_us;
-   bool Timereach = false;
-   uint64_t TimeStartUs = time_us_64(); // Time snapshot
-   while (Timereach == false) // keep sending packets as long as not reached time period?
-   {
-      delta_t_us = time_us_64() - TimeStartUs;
-
-      colorX.intensity = (uint8_t)(m_intensity * delta_t_us + (float)colorA.intensity);
-      colorX.red = (uint8_t)(m_red * delta_t_us + (float)colorA.red);
-      colorX.green = (uint8_t)(m_green * delta_t_us + (float)colorA.green);
-      colorX.blue = (uint8_t)(m_blue * delta_t_us + (float)colorA.blue);
-
-      Packet[0] = 0;
-      Packet[1] = colorX.intensity; 
-      Packet[2] = colorX.red;       
-      Packet[3] = colorX.green;     
-      Packet[4] = colorX.blue;      
-      Packet[5] = 0;
-      Packet[6] = 0;    // Function selection
-                        // 254, 255 sound control
-                        // 200 Color change
-                        // 100, 151 Color change gradually
-                        // 20, 39, 51 Turn on
-                        // 0, 1, 10 Strobe
-      send_packet(Packet);
-      if( delta_t_us > (time_ms * 1000))
-      {
-         Timereach = true;
-      }
-   }
-}
-
 //    Random value will be from 0 to #
 int GenerateRandomInt (int MaxValue)
 {
@@ -1184,135 +1147,49 @@ void autostrobe(color_t color, uint8_t speed, uint16_t time_ms)
    }
 }
 
-
-// Transmit one byte to Midi Output
-//  ------------------------------------------------------
-// | START | D0 | D1 | D2 | D3 | D4 | D5 | D6 | D7 | STOP |
-//  ------------------------------------------------------
-// START is 0
-// STOP is 1
-// MidiOut_GPIO : (Led OFF mean High) (Led ON mean Low )
-// 31250 baud, 32us bit period
-void TxMidiByte(uint8_t Data)
+void ramp_color(color_t colorA, color_t colorB, uint16_t time_ms)
 {
-   SetMidiLed(true); // Led ON during transmission
-   gpio_put(MidiOut_GPIO, 0); // START
-   busy_wait_us(32);
+   // delta Y
+   float delta_intensity = (float)colorB.intensity - (float)colorA.intensity;
+   float delta_red = (float)colorB.red - (float)colorA.red;
+   float delta_green = (float)colorB.green - (float)colorA.green;
+   float delta_blue = (float)colorB.blue - (float)colorA.blue;
+   // delta Y / delta X (slope)
+   float m_intensity = (float)delta_intensity/(float)(1000*time_ms);
+   float m_red = (float)delta_red/(float)(1000*time_ms);
+   float m_green = (float)delta_green/(float)(1000*time_ms);
+   float m_blue = (float)delta_blue/(float)(1000*time_ms);
    
-   (Data & 0x01) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D0
-   busy_wait_us(32);
+   color_t colorX;
 
-   (Data & 0x02) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D1
-   busy_wait_us(32);
-
-   (Data & 0x04) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D2
-   busy_wait_us(32);
-
-   (Data & 0x08) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D3
-   busy_wait_us(32);
-   
-   (Data & 0x10) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D4
-   busy_wait_us(32);
-
-   (Data & 0x20) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D5
-   busy_wait_us(32);
-
-   (Data & 0x40) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D6
-   busy_wait_us(32);
-
-   (Data & 0x80) ? gpio_put(MidiOut_GPIO, 1) : gpio_put(MidiOut_GPIO, 0);  // D7
-   busy_wait_us(32);
-
-   gpio_put(MidiOut_GPIO, 1);
-   busy_wait_us(32);        // STOP last one bit
-
-   SetMidiLed(false); // Led ON during transmission
-}
-void MidiReset(void)
-{
-   printf("Midi Reset\r\n");
-   // To attempt resynchronization
-   TxMidiByte(0x80);    // Midi interface init with two note OFF
-   TxMidiByte(60);      // 0x3C Middle C
-   TxMidiByte(0x64);
-   busy_wait_ms(100);
-   //
-   TxMidiByte(0x80);
-   TxMidiByte(60);      // 0x3C  Middle C
-   TxMidiByte(0x64);
-   busy_wait_ms(100);
-   //
-   //TxMidiByte(0xFF);    // Midi reset this approach does not work i dont even see the trace on the Roland S330
-   //
-   // Alternative: General MIDI Reset (SysEx) This approach is not working on the Roland S330
-   //TxMidiByte(0xF0);    // F0: Start of SysEx
-   //TxMidiByte(0x7E);    // 7E: Non-realtime universal SysEx ID
-   //TxMidiByte(0x7F);    // 7F: Device ID (7F = all devices)
-   //TxMidiByte(0x09);    // 09: Sub-ID 1 (General MIDI)
-   //TxMidiByte(0x01);    // 01: Sub-ID 2 (GM Reset)
-   //TxMidiByte(0xF7);    // F7: End of SysEx
-   //
-   //
-   //TxMidiByte(0xF0);    // F0: Start of SysEx
-   //TxMidiByte(0x41);    // 41: Roland manufacturer ID
-   //TxMidiByte(0x00);    // 00: Device ID (may need adjustment for your setup)
-   //TxMidiByte(0x1E);    // 42: Model ID (this is often used for early Roland devices)
-   //TxMidiByte(0x12);    // 12: Command ID (Data Set)
-   //TxMidiByte(0x40);    // 40 00 7F 00: Payload (example data; adjust if needed)
-   //TxMidiByte(0x00);
-   //TxMidiByte(0x7F);
-   //TxMidiByte(0x00);
-   //TxMidiByte(0x41);    // 41: Checksum (you can calculate it if you change the payload)
-   //TxMidiByte(0xF7);    // F7: End of SysEx
-   //
-   //
-   //TxMidiByte(0xF0); //F0: Start of SysEx   Doesn not work with the ROland s-330
-   //TxMidiByte(0x41); //41: Roland manufacturer ID
-   //TxMidiByte(0x00); //<DeviceID>: Typically 00; could vary (try 00 or 7F for global)
-   //TxMidiByte(0x1E); //16: Model ID (for older Roland devices)
-   //TxMidiByte(0x12); //12: Command ID (Data Set)
-   //TxMidiByte(0x00); //00 00 00: Address (you can try different values, e.g., 00 10 00)
-   //TxMidiByte(0x00);
-   //TxMidiByte(0x00);
-   //TxMidiByte(0x7F); //7F: Data (test value to trigger reset or refresh)
-   //TxMidiByte(0xF7); //F7: End of SysEx
-   //
-   //
-   //Brute force approach, send note OFF on all notes
-   for( uint8_t note = 0x0C; note <= 0x78; note++)
+   uint64_t delta_t_us;
+   bool Timereach = false;
+   uint64_t TimeStartUs = time_us_64(); // Time snapshot
+   while (Timereach == false) // keep sending packets as long as not reached time period?
    {
-      SoundStop(note);
+      delta_t_us = time_us_64() - TimeStartUs;
+
+      colorX.intensity = (uint8_t)(m_intensity * delta_t_us + (float)colorA.intensity);
+      colorX.red = (uint8_t)(m_red * delta_t_us + (float)colorA.red);
+      colorX.green = (uint8_t)(m_green * delta_t_us + (float)colorA.green);
+      colorX.blue = (uint8_t)(m_blue * delta_t_us + (float)colorA.blue);
+
+      Packet[0] = 0;
+      Packet[1] = colorX.intensity; 
+      Packet[2] = colorX.red;       
+      Packet[3] = colorX.green;     
+      Packet[4] = colorX.blue;      
+      Packet[5] = 0;
+      Packet[6] = 0;    // Function selection
+                        // 254, 255 sound control
+                        // 200 Color change
+                        // 100, 151 Color change gradually
+                        // 20, 39, 51 Turn on
+                        // 0, 1, 10 Strobe
+      send_packet(Packet);
+      if( delta_t_us > (time_ms * 1000))
+      {
+         Timereach = true;
+      }
    }
-   SoundStop(0x0C);
-}
-void SoundStart(uint8_t Note, uint8_t Velocity)
-{
-   TxMidiByte(0x90);       // Note ON
-   TxMidiByte(Note);       // Note
-   TxMidiByte(Velocity);   // Velocity
-}
-void SoundStop(uint8_t Note)
-{
-   TxMidiByte(0x80);       // Note OFF
-   TxMidiByte(Note);       // Note
-   TxMidiByte(40);         // Velocity (does not care)
-}
-
-void Tremolo(uint8_t Value)   // Value of tremolo 0-0x7F
-{
-   TxMidiByte(0xB0);
-   TxMidiByte(0x01);
-   TxMidiByte(Value);
-}
-
-// 0xE0 LSB MSB  (7 bits)
-// MSB signed 
-// 0x00 full left  0
-// 0x40 middle     64
-// 0x7F full right 127
-void PitchBend(int8_t Value)   // Value of tremolo -64 to 63
-{
-   TxMidiByte(0xE0);
-   TxMidiByte(0x00);
-   TxMidiByte(Value+64);
 }

@@ -1,6 +1,4 @@
 
-#include "hardware/gpio.h"
-
 #include "dmx.h"
 
 // Generate one frame
@@ -67,3 +65,4 @@ void send_packet(uint8_t* Data)
 
    SetDmxLed(false); // Led OFF after transmission
 }
+

@@ -18,7 +18,7 @@ set(PICO_BOARD pico CACHE STRING "Board type")
 cmake_minimum_required(VERSION 3.13)
 
 # Add this line to export the compile commands
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+#set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # initialize the SDK based on PICO_SDK_PATH
 # note: this must happen before project()
@@ -39,6 +39,9 @@ add_executable(${PROJECT_NAME}
       serialprocess.c
       led.c
       dmx.c
+      midi.c
+      scene.c
+      notes.c
 )
 
 # Add pico_stdlib library which aggregates commonly used features(gpio, time, etc. functions)
