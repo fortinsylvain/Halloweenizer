@@ -26,12 +26,13 @@
 #include "uartbuf.h"  // my uart buffer
 #include "mystring.h" // my string manipulations
 #include "serialprocess.h"
+#include "type.h"
 #include "dmx.h"
 #include "midi.h"
 #include "notes.h"
 #include "scene.h"
 
-#define Str_Version "October 10, 2025 11H48"
+#define Str_Version "October 25, 2025 11H13"
 
 #define UART_ID uart0
 #define BAUD_RATE 115200
@@ -43,37 +44,12 @@ uint32_t MainLoopCount = 0;
 
 //io_irq_ctrl_hw_t *irq_ctrl_base = &iobank0_hw->proc0_irq_ctrl;
 
-
-typedef struct 
-{
-   uint8_t intensity;
-   uint8_t red;
-   uint8_t green;
-   uint8_t blue;
-} color_t;
-
 // Declare prototype for function
 void InterpretCmdString(char *);
 void StoreInterpByte(uint8_t);
-void send_one_frame(uint8_t Data);
-void ramp_color(color_t colorA, color_t colorB, uint16_t time_ms);
-void strobe(uint8_t number, uint16_t period_ms);
-void send_color(color_t color, uint16_t time_ms);
-int GenerateRandomInt (int MaxValue);
-void Black(uint16_t time_ms);
-void autostrobe(color_t color, uint8_t speed, uint16_t time_ms);
 
 #define PacketSize 20
 uint8_t Packet[PacketSize];
-void send_packet(uint8_t*);
-
-// Midi routines
-void TxMidiByte(uint8_t Data);
-void MidiReset(void);
-void SoundStart(uint8_t Note, uint8_t Velocity);
-void SoundStop(uint8_t Note);
-void Tremolo(uint8_t Value);
-void PitchBend(int8_t Value);
 
 inline void InlTpDelay()
 {
@@ -251,6 +227,9 @@ void main() // This enable breakpoint before main loop
    uint64_t delta_t_us;
    uint16_t time_ms;
 
+   bool NoteExpire;
+   uint64_t TimeNoteStartUs;
+
    // Loop forever
    while (true)
    {
@@ -260,691 +239,69 @@ void main() // This enable breakpoint before main loop
 
       // Midi test
       MidiReset();
-      uint8_t Note;
-      //while(1)
-      //{
-         
 
-         //SoundStart(Note,82);
-         //busy_wait_ms(1000);
-         //SoundStop(Note);
-         //busy_wait_ms(5000);
-      //}
+      // Dark choir scene
+      scene_dark_choir();
 
-      //scene_HalloweenOrange();
+      // White ramp up down
+      scene_white_ramp_up_down(); 
 
+      // Random Polyphonic scene
+      scene_random_polyphonic();
 
-      // Random polyphonic with color changes
-      printf("Play Random Polyphonic With Color Changes\r\n");
-      uint8_t my_note_array[] = {36, 37, 39, 40, 41, 44, 46, 49, 53, 56, 58, 59, 61, 62, 66, 67, 68, 70, 71, 80, 81};
-      #define NUM_NOTES (sizeof(my_note_array) / sizeof(my_note_array[0]))
-
-      Timereach = false;
-      TimeStartUs = time_us_64();
-      time_ms = 20000; // duration
-
-      Packet[7] = 0;
-      Packet[6] = 200; // Color function code
-
-      // Seed random once
-      static bool seeded = false;
-      if (!seeded)
-      {
-         srand(time(NULL));
-         seeded = true;
-      }
-
-      uint8_t playingNotes[4];
-      uint8_t numNotesToPlay;
-
-      while (!Timereach)
-      {
-         delta_t_us = time_us_64() - TimeStartUs;
-
-         // Randomize color for each packet
-         Packet[2] = rand() % 256; // Red
-         Packet[3] = rand() % 256; // Green
-         Packet[4] = rand() % 256; // Blue
-         Packet[1] = rand() % 128; // Intensity, optional
-         send_packet(Packet);
-
-         // Pick new random notes
-         numNotesToPlay = 3 + rand() % 3; // 3,4,5 notes
-         for (int i = 0; i < numNotesToPlay; i++)
-         {
-            playingNotes[i] = my_note_array[rand() % NUM_NOTES];
-            SoundStart(playingNotes[i], 64); // medium velocity
-         }
-
-         busy_wait_ms(2000);
-
-         // Stop previous notes
-         for (int i = 0; i < numNotesToPlay; i++)
-         {
-            SoundStop(playingNotes[i]);
-         }
-
-         if (delta_t_us > (time_ms * 1000))
-         {
-            Timereach = true;
-         }
-      }
-
-      // Stop all notes at the end
-      for (int i = 0; i < numNotesToPlay; i++)
-      {
-         SoundStop(playingNotes[i]);
-      }
-      Black(2000); // fade to black
-
-
-      // Halloween orange
-      printf("Halloween orange\r\n");
-      Note = 47; // B2 Hurlement type syrene lower pitch (one shot)
-      SoundStart(Note, 127);
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 255;
-      colorB.green = 23;
-      colorB.blue = 2;
-      ramp_color(colorA, colorB, 4000);
-      // send_color(colorB, 13000);
-      //  play organ for a while
-      //uint8_t my_note_array[] = {36, 37, 39, 40, 41, 44, 46, 49, 53, 56, 58, 59, 61, 62, 66, 67, 68, 70, 71, 80, 81};
-      Timereach = false;
-      TimeStartUs = time_us_64(); // Time snapshot
-      time_ms = 20000;
-      Tremolo(0x7F);             // Max
-      while (Timereach == false) // keep sending packets as long as not reached time period?
-      {
-         delta_t_us = time_us_64() - TimeStartUs;
-         uint8_t OrganRandomNumber = GenerateRandomInt(20);
-         uint8_t OrganRandomNote = my_note_array[OrganRandomNumber];
-         uint16_t OrganRandomDuration = GenerateRandomInt(1500);
-         uint8_t OrganRandomVelocity = GenerateRandomInt(127);
-         SoundStart(OrganRandomNote, OrganRandomVelocity);
-         // busy_wait_ms(300);
-         send_color(colorB, OrganRandomDuration);
-         SoundStop(OrganRandomNote);
-         if (delta_t_us > (time_ms * 1000))
-         {
-            Timereach = true;
-         }
-      }
-      Tremolo(0); // OFF
-      SoundStop(Note);
-      SoundStart(Note, 127);
-      ramp_color(colorB, colorA, 4000);
-      SoundStop(Note);
-      Black(2000);
+      // Halloween orange scene
+      scene_halloween_orange();
 
       // Automatic color sudent change
-      printf("Automatic color change\r\n");
-      SoundStart(43,127);  // G2 Laph Very lower frequency pitch
-      SoundStart(77,127);  // F5 Crying body (one shot)
-      Timereach = false;
-      TimeStartUs = time_us_64(); // Time snapshot
-      time_ms = 20000;
-      Packet[0] = 0;
-      Packet[1] = 0;    // intensity
-      Packet[2] = 0;    // red
-      Packet[3] = 0;    // green
-      Packet[4] = 0;    // blue
-      Packet[5] = 0;
-      Packet[6] = 200;    // Function selection
-                           // 254, 255 sound control
-                           // 200 Color change
-                           // 100, 151 Color change gradually
-                           // 20, 39, 51 Turn on
-                           // 0, 1, 10 Strobe
-      while (Timereach == false) // keep sending packets as long as not reached time period?
-      {
-         delta_t_us = time_us_64() - TimeStartUs;
-         send_packet(Packet);
-         if( delta_t_us > (time_ms * 1000))
-         {
-            Timereach = true;
-         }
-      }
-      SoundStop(43);
-      SoundStop(77);
-      Black(2000);
+      scene_automatic_color_change();
 
-      // white ramp up down
-      printf("White ramp up down\r\n");
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 255;
-      colorB.green = 255;
-      colorB.blue = 255;
-      ramp_color(colorA, colorB, 1000);   // ramp up 
-      ramp_color(colorB, colorA, 2000);   // ramp down
-      busy_wait_ms(2000);
-      ramp_color(colorA, colorB, 800);   // ramp up 
-      ramp_color(colorB, colorA, 3000);   // ramp down
-      busy_wait_ms(2000);
-      ramp_color(colorA, colorB, 700);   // ramp up 
-      ramp_color(colorB, colorA, 4000);   // ramp down
-      busy_wait_ms(2000);
+      // Yellow candy treets scene
+      scene_yellow_candy_treets();
 
-      // yello candy treets
-      printf("Yellow candy treets\r\n");
-      SoundStart(79,127);  // G5 Crying body (one shot)
-      busy_wait_ms(1000);
-      SoundStop(79);
-      colorA.intensity = 255;    // Yellow
-      colorA.red = 255;
-      colorA.green = 99;
-      colorA.blue = 0;
-      colorB.intensity = 255;    // Black
-      colorB.red = 0;
-      colorB.green = 0;
-      colorB.blue = 0;
-      send_color(colorB, 1);
-      ramp_color(colorB, colorA, 4000);
-      SoundStart(77,127);  // F5 Crying body (one shot)
-      send_color(colorA, 13000);
-      SoundStop(77);
-      ramp_color(colorA, colorB, 4000);
-      SoundStart(79,127);  // G5 Crying body (one shot)
-      busy_wait_ms(1000);
-      SoundStart(79,127);  // G5 Crying body (one shot)
-      Black(2000);
-      SoundStop(79);
-      SoundStop(77);
+      // Normal light scene
+      scene_normal_light();
 
-      // Normal light
-      printf("Normal light\r\n");
-      SoundStart(48,70);   // C3 Hurlement type syrene lower pitch (one shot)
-      busy_wait_ms(1000);
-      SoundStart(36,100);  // C2 Organ
-      Tremolo(0x7F); // Max tremolo
-      colorA.intensity = 255;
-      colorA.red = 255;
-      colorA.green = 255;
-      colorA.blue = 255;
-      send_color(colorA, 10000);
-      SoundStop(36);
-      SoundStop(48);
-      Tremolo(0); // tremolo stop
+      // Defective light scene
+      scene_defective_light();
 
-      // Defective light (black glitch)
-      printf("Defective light (black glitch)\r\n");
-      SoundStart(50,70);   // D3 Laph Very low frequency pitch
-      busy_wait_ms(1000);
-      SoundStart(36,100);  // C2 Organ
-      Tremolo(0x7F); // Max tremolo
-      colorA.intensity = 255;
-      colorA.red = 255;
-      colorA.green = 255;
-      colorA.blue = 255;
-      colorB.intensity = 0;
-      colorB.red = 0;
-      colorB.green = 0;
-      colorB.blue = 0;
-      for (int iter = 0; iter < 15; iter++)
-      {
-         int RandomPitchBend = (GenerateRandomInt(16)*4-1)-64;
-         PitchBend(RandomPitchBend);
-         send_color(colorA, GenerateRandomInt(3000)); // random ON time
-         for (int n = 0; n < GenerateRandomInt(7); n++)  // random number of glitch
-         {
-            send_color(colorB, GenerateRandomInt(100)); // random OFF time
-            send_color(colorA, GenerateRandomInt(150)); // random ON time
-         }
-      }
-      SoundStop(50);
-      SoundStop(36);
-      PitchBend(0);
-      Tremolo(0); // tremolo stop
+      // Cold purple black light scene
+      scene_cold_purple_black_light();
 
-      // Cold purple black light
-      printf("Cold purple black light\r\n");
-      SoundStart(63,100);  //D#4 Monster Whaaa
-      busy_wait_ms(2000);
-      SoundStop(63);
-      SoundStart(64,100); // E4 Hurlement type syrene higher pitch (one shot)
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 255;
-      colorB.green = 0;
-      colorB.blue = 255;
-      ramp_color(colorA, colorB, 4000);
-      send_color(colorB, 8000);
-      ramp_color(colorB, colorA, 4000);
-      SoundStop(64);
+      // Red hearth beat scene
+      scene_red_hearth_beat();
 
-      // Red hearth beat
-      printf("Red hearth beat\r\n");
-      SoundStart(60,127); // C4 Rire lent (joue pendant l'appuie)
-      busy_wait_ms(1000);
-      SoundStop(60);
-      SoundStart(43,127); // G2 Laph Very lower frequency pitch
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 255;
-      colorB.green = 0;
-      colorB.blue = 0;
-      for (int n = 0; n<10; n++)
-      {
-         ramp_color(colorA, colorB, 100);   // ramp up
-         ramp_color(colorB, colorA, 90);   // ramp down
-         busy_wait_ms(40);
-         ramp_color(colorA, colorB, 130);   // ramp up
-         ramp_color(colorB, colorA, 140);   // ramp down
-         busy_wait_ms(800);
-      }
-      SoundStop(43);
+      // Wavy color green scen
+      scene_wavy_color_green();
 
-      // Wavy color green
-      printf("Wavy color green\r\n");
-      Note = 60;   // C4 Rire lent (joue pendant l'appuie)
-      SoundStart(Note,90);
-      colorC.intensity = 255;
-      colorC.red = 0;
-      colorC.green = 0;
-      colorC.blue = 0;
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 128;
-      colorA.blue = 0;
-      ramp_color(colorC, colorA, 3000);
-      SoundStop(Note);
-      color_t colorX;
-      delta_t_us;
-      Timereach = false;
-      TimeStartUs = time_us_64(); // Time snapshot
-      time_ms = 10000;
-      float FrequencyIni = 0.75;    // make the frequency change uop and down as time goes
-      float Frequency;
-      uint16_t Amplitude = 127; 
-      Note = 82;   // A#5 Laught High pitch
-      SoundStart(Note,90);
-      while (Timereach == false) // keep sending packets as long as not reached time period?
-      {
-         delta_t_us = time_us_64() - TimeStartUs;
-         Frequency = FrequencyIni + FrequencyIni * sin((2*3.1416*0.05*(float)delta_t_us)/1000000);
-         colorX.intensity = colorA.intensity;
-         colorX.red = colorA.red;
-         colorX.green = (uint8_t)(colorA.green + Amplitude * sin((2*3.1416*Frequency*(float)delta_t_us)/1000000));
-         colorX.blue = colorA.blue;
-         Packet[0] = 0;
-         Packet[1] = colorX.intensity; 
-         Packet[2] = colorX.red;       
-         Packet[3] = colorX.green;     
-         Packet[4] = colorX.blue;      
-         Packet[5] = 0;
-         Packet[6] = 0;    // Function selection
-                           // 254, 255 sound control
-                           // 200 Color change
-                           // 100, 151 Color change gradually
-                           // 20, 39, 51 Turn on
-                           // 0, 1, 10 Strobe
-         send_packet(Packet);
-         if( delta_t_us > (time_ms * 1000))
-         {
-            Timereach = true;
-         }
-      }
-      SoundStop(Note);
-      Note = 60;   // C4 Rire lent (joue pendant l'appuie)
-      SoundStart(Note,90);
-      Black(2000);
-      SoundStop(Note);
+      // Defective light random glitch scene
+      scene_defective_light_random_glitch();
 
-      // Defective light (random color glitch)
-      printf("Defective light (random color glitch)\r\n");
-      Note = 54;   // F#3 Hurlement type syrene (one shot)
-      SoundStart(Note,127);
-      busy_wait_ms(50);
-      SoundStop(Note);
-      colorA.intensity = 255;
-      colorA.red = 255;    // normal white light color
-      colorA.green = 255;
-      colorA.blue = 255;
-      for (int iter = 0; iter < 15; iter++)
-      {
-         send_color(colorA, GenerateRandomInt(3000)); // random ON time
-         Note = 55;   // G3 Beast Glutural Low
-         SoundStart(Note,127);
-         for (int n = 0; n < GenerateRandomInt(7); n++)  // random number of glitch
-         {
-            colorB.red = GenerateRandomInt(255);   // paranormal random color
-            colorB.green = GenerateRandomInt(255);
-            colorB.blue = GenerateRandomInt(255);
-            colorB.intensity = GenerateRandomInt(255);
-            send_color(colorB, GenerateRandomInt(150)); // random paranormal color time
-            send_color(colorA, GenerateRandomInt(100)); // random ON time
-         }
-         SoundStop(Note);
-      }
-      colorB.intensity = 0;
-      colorB.red = 0;
-      colorB.green = 0;
-      colorB.blue = 0;
-      send_color(colorB, 5000); // Light goes abruptly dead  
+      // Ramdom color quick change scene
+      scene_random_color_quick_change();
 
-      // Random color quick change
-      printf("Random color quick change\r\n");
-      uint8_t my_randomColorSound_array[] = {90, 91, 93, 95};
-      for (int iter = 0; iter < 8; iter++)
-      {
-         uint8_t Number_Of_Color_Flash = GenerateRandomInt(25);
-         uint8_t randomColorSound = my_randomColorSound_array[GenerateRandomInt(3)];
-         SoundStart(randomColorSound,60);
-         for (int n = 0; n < Number_Of_Color_Flash; n++)
-         {
-            colorA.intensity = GenerateRandomInt(255);
-            colorA.red = GenerateRandomInt(255);
-            colorA.green = GenerateRandomInt(255);
-            colorA.blue = GenerateRandomInt(255);
-            send_color(colorA, GenerateRandomInt(200));   // Red 
-         }  
-         SoundStop(randomColorSound);
-         colorA.intensity = 255;
-         colorA.red = 0;
-         colorA.green = 0;
-         colorA.blue = 0;
-         send_color(colorA, GenerateRandomInt(4000));  // Black for random duration
-      }
-
-      // Pale skin
-      printf("Pale skin\r\n");
-      Note = 38;   // D2 GLutural Water sink lower frequency pitch
-      SoundStart(Note,60);
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 218;
-      colorB.green = 42;
-      colorB.blue = 14;
-      colorC.intensity = 255;
-      colorC.red = 255;
-      colorC.green = 12;
-      colorC.blue = 0;
-      ramp_color(colorA, colorB, 4000);
-      SoundStop(Note);
-      Note = 42;   // F#2 GLutural Water sink frequency pitch
-      SoundStart(Note,100);
-      ramp_color(colorB, colorC, 4000);
-      //send_color(colorB, 4000);
-      SoundStop(Note);
-      Note = 38;   // D2 GLutural Water sink lower frequency pitch
-      SoundStart(Note,90);
-      ramp_color(colorC, colorB, 4000);
-      SoundStop(Note);
-      Note = 42;   // F#2 GLutural Water sink frequency pitch
-      SoundStart(Note,127);
-      ramp_color(colorB, colorC, 4000);
-      SoundStop(Note);
-      Note = 38;   // D2 GLutural Water sink lower frequency pitch
-      SoundStart(Note,90);
-      ramp_color(colorC, colorB, 4000);
-      SoundStop(Note);
-      Note = 42;   // F#2 GLutural Water sink frequency pitch
-      SoundStart(Note,50);
-      ramp_color(colorB, colorA, 4000);
-      SoundStop(Note);
-      Black(2000);
+      // Pale skin scene
+      scene_pale_skin();
       
-      // Cold blue
-      printf("Cold blue\r\n");
-      Note = 43;   // G2 Laph Very lower frequency pitch
-      SoundStart(Note,127);
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 0;
-      colorB.green = 247;
-      colorB.blue = 255;
-      ramp_color(colorA, colorB, 4000);
-      send_color(colorB, 13000);
-      ramp_color(colorB, colorA, 4000);
-      Black(2000);
-      SoundStop(Note);
+      // Cold blue scene
+      scene_cold_blue();
 
-      // Thunderstorm lightning effect using white flash strobes
-      printf("Thunderstorm lightning effect\r\n");
-      colorA.intensity = 255; // Black
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255; // Gray day light
-      colorB.red = 20;
-      colorB.green = 23;
-      colorB.blue = 27;
-      ramp_color(colorA, colorB, 5000);
-      uint8_t ThunderMinNumberFlash = 1;
-      uint8_t ThunderMaxNumberFlash = 5;
-      uint16_t ThunderMaxPeriod_ms = 200;
-      uint16_t ThunderMinPeriod_ms = 50;
-      Note = 57;   // A3 Thunderstorm (one shot)
-      for (int iter = 0; iter < 12; iter++)
-      {
-         uint8_t Number_Of_Flash = (uint8_t)GenerateRandomInt(ThunderMaxNumberFlash-ThunderMinNumberFlash)+ThunderMinNumberFlash;
-         uint16_t ThunderFlashPeriod = GenerateRandomInt(ThunderMaxPeriod_ms-ThunderMinPeriod_ms)+ThunderMinPeriod_ms;
-         uint8_t ThunderSoundIntensity = (uint8_t)(127*Number_Of_Flash/ThunderMaxNumberFlash);
-         SoundStart(Note,ThunderSoundIntensity);
-         SoundStop(Note);
-         strobe(Number_Of_Flash, ThunderFlashPeriod);
-         //busy_wait_ms(GenerateRandomInt(4000));
-         send_color(colorB, 2000+GenerateRandomInt(4000));
-      }
-      ramp_color(colorB, colorA, 5000);
+      // Thunderstorm lightning effect scene
+      scene_thunderstorm_lightning_effect();
 
-      // Blue dark modulation
-      printf("Blue dark modulation\r\n");
-      colorA.intensity = 255;
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255;
-      colorB.red = 0;
-      colorB.green = 0;
-      colorB.blue = 255;
-      ramp_color(colorA, colorB, 5000);   // slow ramp up 
-      colorA.blue = 40;
-      for (int n = 0; n<7; n++)
-      {
-         uint8_t BlueSoundIntensity = (uint8_t)120*(n+1)/8;
-         SoundStart(74,BlueSoundIntensity);  // D5 Wild animal
-         ramp_color(colorB, colorA, 2000);   // half fade
-         SoundStart(76,BlueSoundIntensity+10);  // E5 Wild animal higher pitch
-         ramp_color(colorA, colorB, 2000);   // back to blue
-         SoundStop(74);
-         SoundStop(76);
-      }
-      colorA.blue = 0;
-      ramp_color(colorB, colorA, 5000);   //fade out
+      // Blue dark modulation scene
+      scene_blue_dark_modulation();
 
-      // White flash strobes on red background
-      printf("White flash strobes on red background\r\n");
-      Note = 43;   // G2 Laph Very lower frequency pitch
-      SoundStart(Note,127);
-      colorA.intensity = 255;    // Red background
-      colorA.red = 255;
-      colorA.green = 0;
-      colorA.blue = 0;
-      send_color(colorA, 1000);  // White
-      colorB.intensity = 255;
-      colorB.red = 255;
-      colorB.green = 255;
-      colorB.blue = 255;
-      colorC.intensity = 255;    // Black
-      colorC.red = 0;
-      colorC.green = 0;
-      colorC.blue = 0;
-      for (int iter = 0; iter < 8; iter++)
-      {
-         SoundStart(77,40);  // F5 Crying body (one shot)
-         send_color(colorB, 60);    // White strobe
-         //send_color(colorC, 100);   // Black
-         //send_color(colorA, 700);  // Red
-         ramp_color(colorC, colorA, 200);
-         //strobe(3, 150);
-         send_color(colorA, 1000);   // Red
-      }
-      SoundStop(77);
-      SoundStop(Note);
-      Black(2000);
+      // White flash strobes on red background scene
+      scene_white_flash_strobes_on_red_background();
 
-      // burning
-      printf("Burning\r\n");
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 0;
-      colorB.intensity = 255; // Halloween orange
-      colorB.red = 255;
-      colorB.green = 23;
-      colorB.blue = 2;
-      colorC.intensity = 255; // Full Red
-      colorC.red = 255;
-      colorC.green = 0;
-      colorC.blue = 0;
-      ramp_color(colorA, colorB, 3000);   // Initial ramp up
-      Note = 77;   // F5 Crying body (one shot)
-      SoundStart(Note,127);
-      SoundStop(Note);
-      Note = 38;   // D2 GLutural Water sink lower frequency pitch
-      SoundStart(Note,127);
-      delta_t_us;
-      Timereach = false;
-      TimeStartUs = time_us_64(); // Time snapshot
-      time_ms = 20000;
-      while (Timereach == false) // keep sending packets as long as not reached time period?
-      {
-         delta_t_us = time_us_64() - TimeStartUs;
+      // Burning scene
+      scene_burning();
 
-         ramp_color(colorB, colorC, GenerateRandomInt(400));
-         ramp_color(colorC, colorB, GenerateRandomInt(400));
-
-         if( delta_t_us > (time_ms * 1000))
-         {
-            Timereach = true;
-         }
-      }
-      Note = 75;   // D#5 Gun shot (one shot)
-      SoundStart(Note,100);
-      SoundStop(Note);
-      ramp_color(colorB, colorA, 3000);   // Ramp down
-      Black(3000);
-
-      // Automatic strobe
-      printf("Automatic strobe\r\n");
-      //void autostrobe(color_t color, uint8_t speed, uint16_t time_ms);  
-      colorA.intensity = 255; // Blue
-      colorA.red = 0;
-      colorA.green = 0;
-      colorA.blue = 255;
-      Note = 36; // C2 Organ
-      SoundStart(Note,80);
-      autostrobe(colorA, 100, 3000);
-      SoundStop(Note);
-      Black(2000);
-      colorA.intensity = 255; // Red
-      colorA.red = 255;
-      colorA.green = 0;
-      colorA.blue = 0;
-      Note = 37; // C#2 Organ 
-      SoundStart(Note,80);
-      autostrobe(colorA, 255, 1000);
-      SoundStop(Note);
-      Black(2000);
-      colorA.intensity = 255; // Green
-      colorA.red = 0;
-      colorA.green = 255;
-      colorA.blue = 0;
-      Note = 40; // E2 Organ  
-      SoundStart(Note,80);
-      autostrobe(colorA, 140, 2000);
-      SoundStop(Note);
-      Black(1500);
-      colorA.intensity = 255; // Red + Blue
-      colorA.red = 255;
-      colorA.green = 0;
-      colorA.blue = 255;
-      Note = 41;   // F2 Organ 
-      SoundStart(Note,80);
-      autostrobe(colorA, 170, 1000);
-      SoundStop(Note);
-      Black(2200);
-      colorA.intensity = 255; // Red + Green
-      colorA.red = 255;
-      colorA.green = 255;
-      colorA.blue = 0;
-      Note = 44;   // G#2 Organ
-      SoundStart(Note,80);
-      autostrobe(colorA, 190, 1000);
-      SoundStop(Note);
-      Black(1500);
-      colorA.intensity = 255; // Green + Blue
-      colorA.red = 0;
-      colorA.green = 255;
-      colorA.blue = 255;
-      Note = 46;   // A#2 Organ
-      SoundStart(Note,80);
-      autostrobe(colorA, 210, 1000);
-      SoundStop(Note);
-      Black(2500);
-      colorA.intensity = 255; // White
-      colorA.red = 255;
-      colorA.green = 255;
-      colorA.blue = 255;
-      Note = 49;   // C#3 Organ
-      SoundStart(41,80);   // F2 Organ  
-      SoundStart(59,80);   // B3 Organ  
-      SoundStart(62,80);   // D4 Organ  
-      SoundStart(70,80);   // A#4 Organ
-      autostrobe(colorA, 250, 2500);
-      SoundStop(41);
-      SoundStop(59);
-      SoundStop(62);
-      SoundStop(70);
-      Black(3000);
+      // Automatic strobe scene
+      scene_automatic_strobe();
 
       // Automatic color gradual change
-      printf("Automatic color gradual change\r\n");
-      Timereach = false;
-      TimeStartUs = time_us_64(); // Time snapshot
-      time_ms = 20000;
-      Packet[0] = 0;
-      Packet[1] = 0;    // intensity
-      Packet[2] = 0;    // red
-      Packet[3] = 0;    // green
-      Packet[4] = 0;    // blue
-      Packet[5] = 0;
-      Packet[6] = 100;    // Function selection
-                           // 254, 255 sound control
-                           // 200 Color change
-                           // 100, 151 Color change gradually
-                           // 20, 39, 51 Turn on
-                           // 0, 1, 10 Strobe
-      while (Timereach == false) // keep sending packets as long as not reached time period?
-      {
-         delta_t_us = time_us_64() - TimeStartUs;
-         send_packet(Packet);
-         if( delta_t_us > (time_ms * 1000))
-         {
-            Timereach = true;
-         }
-      }
-      Black(3000);
+      scene_automatic_color_gradual_change();
 
       // Led toggle.  Take 440ns to process!
       // if ((time_us_64() - LedToggleTimeStartUs) > (LedToggleTime_ms * 1000)) // Reached led toggle time period?
@@ -1008,6 +365,7 @@ void InterpretCmdString(char *CmdStr)
    {
       // printf("\033c");
       ClearScreen();
+      MidiReset();
    }
    else if (CmpStrEqu(CmdStr, "ver") == true)
    {
@@ -1042,154 +400,4 @@ void InterpretCmdString(char *CmdStr)
    ClearCmd();
 }
 
-void strobe(uint8_t number, uint16_t period_ms)
-{
-      uint8_t n = number;
-      for(int n = 0; n < number; n++)
-      {
-         Packet[0] = 0;
-         Packet[1] = 255; // intensity
-         Packet[2] = 255; // Red
-         Packet[3] = 255; // Green
-         Packet[4] = 255; // Blue
-         Packet[5] = 0;
-         Packet[6] = 0;    // Function selection
-                           // 254, 255 sound control
-                           // 200 Color change
-                           // 100, 151 Color change gradually
-                           // 20, 39, 51 Turn on
-                           // 0, 1, 10 Strobe
-         send_packet(Packet);
-         busy_wait_ms(16);
 
-         Packet[1] = 0; // intensity
-         Packet[2] = 0; // Red
-         Packet[3] = 0; // Green
-         Packet[4] = 0; // Blue
-
-         send_packet(Packet);
-
-         busy_wait_ms(period_ms);
-      }
-}
-
-void send_color(color_t color, uint16_t time_ms)
-{
-   uint64_t TimeStartUs = time_us_64(); // Time snapshot
-
-   while ((time_us_64() - TimeStartUs) < (uint64_t)(time_ms * 1000)) // keep sending packets as long as not reached time period?
-   {
-      Packet[0] = 0;
-      Packet[1] = color.intensity;  // intensity
-      Packet[2] = color.red;     // Red
-      Packet[3] = color.green;   // Green
-      Packet[4] = color.blue;    // Blue
-      Packet[5] = 0;
-      Packet[6] = 0;    // Function selection
-                        // 254, 255 sound control
-                        // 200 Color change
-                        // 100, 151 Color change gradually
-                        // 20, 39, 51 Turn on
-                        // 0, 1, 10 Strobe
-      send_packet(Packet);
-   }
-}
-
-//    Random value will be from 0 to #
-int GenerateRandomInt (int MaxValue)
-{
-    unsigned int iseed = (unsigned int)time(NULL);          //Seed srand() using time() otherwise it will start from a default value of 1
-    //srand (iseed);
-    int random_value = (int)((1.0 + MaxValue) * rand() / ( RAND_MAX + 1.0 ) );      //Scale rand()'s return value against RAND_MAX using doubles instead of a pure modulus to have a more distributed result.
-    return(random_value);
-}
-
-void Black(uint16_t time_ms)
-{
-   color_t colorA;
-   colorA.intensity = 255;    // Black
-   colorA.red = 0;
-   colorA.green = 0;
-   colorA.blue = 0;
-   send_color(colorA, time_ms);
-}
-
-// White flash strobe using the automatic strober
-// speed: 8 slowest, 255 fastest
-void autostrobe(color_t color, uint8_t speed, uint16_t time_ms)
-{
-   bool Timereach = false;
-   uint64_t TimeStartUs = time_us_64(); // Time snapshot
-   uint64_t delta_t_us;
-   Packet[0] = 0;
-   Packet[1] = color.intensity;  // intensity of strobe
-   Packet[2] = color.red;     // red strobe component
-   Packet[3] = color.green;   // green "        "
-   Packet[4] = color.blue;    // blue  "        "
-   Packet[5] = speed;         // 0-7: RGBlight control
-                              // 8, 9, 10 strobe slow speed
-                              // 128: strobe medium speed
-                              // 255: strobe fast speed
-   Packet[6] = 10;   // Function selection
-                     // 254, 255 sound control
-                     // 200 Color change
-                     // 100, 151 Color change gradually
-                     // 20, 39, 51 Turn on
-                    // 0, 1, 10 Strobe
-   while (Timereach == false) // keep sending packets as long as not reached time period?
-   {
-      delta_t_us = time_us_64() - TimeStartUs;
-      send_packet(Packet);
-      if( delta_t_us > (time_ms * 1000))
-      {
-         Timereach = true;
-      }
-   }
-}
-
-void ramp_color(color_t colorA, color_t colorB, uint16_t time_ms)
-{
-   // delta Y
-   float delta_intensity = (float)colorB.intensity - (float)colorA.intensity;
-   float delta_red = (float)colorB.red - (float)colorA.red;
-   float delta_green = (float)colorB.green - (float)colorA.green;
-   float delta_blue = (float)colorB.blue - (float)colorA.blue;
-   // delta Y / delta X (slope)
-   float m_intensity = (float)delta_intensity/(float)(1000*time_ms);
-   float m_red = (float)delta_red/(float)(1000*time_ms);
-   float m_green = (float)delta_green/(float)(1000*time_ms);
-   float m_blue = (float)delta_blue/(float)(1000*time_ms);
-   
-   color_t colorX;
-
-   uint64_t delta_t_us;
-   bool Timereach = false;
-   uint64_t TimeStartUs = time_us_64(); // Time snapshot
-   while (Timereach == false) // keep sending packets as long as not reached time period?
-   {
-      delta_t_us = time_us_64() - TimeStartUs;
-
-      colorX.intensity = (uint8_t)(m_intensity * delta_t_us + (float)colorA.intensity);
-      colorX.red = (uint8_t)(m_red * delta_t_us + (float)colorA.red);
-      colorX.green = (uint8_t)(m_green * delta_t_us + (float)colorA.green);
-      colorX.blue = (uint8_t)(m_blue * delta_t_us + (float)colorA.blue);
-
-      Packet[0] = 0;
-      Packet[1] = colorX.intensity; 
-      Packet[2] = colorX.red;       
-      Packet[3] = colorX.green;     
-      Packet[4] = colorX.blue;      
-      Packet[5] = 0;
-      Packet[6] = 0;    // Function selection
-                        // 254, 255 sound control
-                        // 200 Color change
-                        // 100, 151 Color change gradually
-                        // 20, 39, 51 Turn on
-                        // 0, 1, 10 Strobe
-      send_packet(Packet);
-      if( delta_t_us > (time_ms * 1000))
-      {
-         Timereach = true;
-      }
-   }
-}

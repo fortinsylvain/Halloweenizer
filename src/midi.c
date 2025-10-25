@@ -100,6 +100,9 @@ void MidiReset(void)
       SoundStop(note);
    }
    SoundStop(0x0C);
+
+   Tremolo(0x00);  // Tremolo OFF
+   PitchBend(0);  // Pitch Bend center
 }
 
 void SoundStart(uint8_t Note, uint8_t Velocity)
